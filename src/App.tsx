@@ -1,51 +1,70 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useEffect, useState } from 'react'
+import Settings from './components/Settings'
+import { useShortcut } from './hooks/useShortcut'
+import { useAppStore } from './store/appStore'
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [inputValue, setInputValue] = useState('')
+  const isWindowVisible = useAppStore((state) => state.isWindowVisible)
+  const isSettingsOpen = useAppStore((state) => state.isSettingsOpen)
+  const hideWindow = useAppStore((state) => state.hideWindow)
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  // 初始化快捷键
+  useShortcut()
+
+  // 处理输入框提交
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log('Input submitted:', inputValue)
+    setInputValue('')
+    hideWindow()
   }
 
+  // 点击窗口外部关闭窗口
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.id === 'app-root' && isWindowVisible) {
+        hideWindow()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isWindowVisible, hideWindow])
+
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div
+      id="app-root"
+      className="w-full h-full flex justify-center items-center bg-transparent overflow-hidden"
+    >
+      <div className="bg-red-500">
+        123
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
+      <div
+        className={`w-full h-full flex justify-center items-center transition-opacity duration-200 ${isWindowVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+        {isSettingsOpen ? (
+          <Settings />
+        ) : (
+          <form onSubmit={handleSubmit} className="w-full max-w-[600px] px-5">
+            <div className="w-full relative">
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Enter your query..."
+                className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl outline-none transition-all duration-200 bg-white shadow-lg focus:border-primary focus:ring-2 focus:ring-primary/10"
+                autoFocus
+              />
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
 }
 
-export default App;
+export default App
