@@ -1,8 +1,4 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
 
 #[tauri::command]
 async fn show_window(window: tauri::Window) -> Result<(), String> {
@@ -78,12 +74,38 @@ async fn toggle_window_visibility(window: tauri::Window) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+async fn set_window_size(window: tauri::Window, width: f64, height: f64) -> Result<(), String> {
+    println!("🎯 [TAURI命令] set_window_size 命令被调用: width={}, height={}", width, height);
+    
+    use tauri::Size;
+    use tauri::LogicalSize;
+    
+    let size = Size::Logical(LogicalSize { width, height });
+    
+    match window.set_size(size) {
+        Ok(_) => {
+            println!("✅ [TAURI命令] 窗口尺寸设置成功");
+            Ok(())
+        },
+        Err(e) => {
+            println!("❌ [TAURI命令] 窗口尺寸设置失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![greet, show_window, hide_window, toggle_window_visibility])
+        .invoke_handler(tauri::generate_handler![
+            show_window, 
+            hide_window, 
+            toggle_window_visibility,
+            set_window_size
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { useEffect, useRef, useState } from 'react'
 import Settings from './components/Settings'
 import { useShortcut } from './hooks/useShortcut'
 import { useAppStore } from './store/appStore'
+import { logger } from './utils/logger'
 
 function App() {
   const [inputValue, setInputValue] = useState('')
   const isWindowVisible = useAppStore((state) => state.isWindowVisible)
   const isSettingsOpen = useAppStore((state) => state.isSettingsOpen)
   const hideWindow = useAppStore((state) => state.hideWindow)
-
-
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // 初始化快捷键
   useShortcut()
@@ -20,10 +21,49 @@ function App() {
   // 处理输入框提交
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Input submitted:', inputValue)
+    logger.log('Input submitted:', inputValue)
     setInputValue('')
     hideWindow()
   }
+
+  // ESC 键关闭窗口
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isWindowVisible) {
+        logger.log('🔑 [ESC] ESC 键按下，关闭窗口')
+        hideWindow()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isWindowVisible, hideWindow])
+
+  // 动态调整窗口高度
+  useEffect(() => {
+    if (!contentRef.current) return
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height
+        const width = 600 // 固定宽度
+
+        logger.log(`📏 [窗口尺寸] 内容高度变化: ${height}px`)
+
+        // 调用 Tauri 命令调整窗口大小
+        invoke('set_window_size', { width, height })
+          .then(() => {
+            logger.log(`✅ [窗口尺寸] 窗口大小已调整: ${width}x${height}`)
+          })
+          .catch((error) => {
+            logger.error('❌ [窗口尺寸] 调整窗口大小失败:', error)
+          })
+      }
+    })
+
+    resizeObserver.observe(contentRef.current)
+    return () => resizeObserver.disconnect()
+  }, [])
 
   // 点击窗口外部关闭窗口
   useEffect(() => {
@@ -46,6 +86,7 @@ function App() {
       className="w-full h-full flex justify-center items-center bg-transparent overflow-hidden"
     >
       <div
+        ref={contentRef}
         className={`w-full h-full flex justify-center items-center transition-opacity duration-200 ${isWindowVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
         {isSettingsOpen ? (
