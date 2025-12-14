@@ -1,247 +1,250 @@
 # Honey Agent Tools
 
-一个基于 Tauri + React + TypeScript 的桌面应用，提供快捷的输入框和灵活的快捷键配置功能。
+一个基于 Tauri + React + TypeScript 的类 uTools 桌面应用，提供快捷的插件系统、全局快捷键和独立窗口管理。
+
+> ⚠️ **重要技术栈说明**
+>
+> - 本项目使用 **Tailwind CSS 4**（不是 v3）- 配置在 `index.css` 的 `@theme` 中，**不要创建 `tailwind.config.js`**！
+> - 使用 **shadcn/ui** 组件库（需适配 Tailwind 4）
+> - 使用 **Tauri 2.x**（需配置 capabilities 权限）
 
 ## 技术栈
 
-| 技术                               | 版本   | 用途             |
-| ---------------------------------- | ------ | ---------------- |
-| React                              | 19.1.0 | 前端框架         |
-| TypeScript                         | 5.8.3  | 类型系统         |
-| Tauri                              | 2.0.0  | 桌面应用框架     |
-| Zustand                            | 5.0.9  | 状态管理         |
-| Tailwind CSS                       | 4.1.18 | CSS 框架         |
-| Biome                              | 2.3.8  | 代码规范和格式化 |
-| @tauri-apps/plugin-global-shortcut | 2.3.1  | 全局快捷键支持   |
+| 技术                               | 版本       | 用途             | 特别说明                      |
+| ---------------------------------- | ---------- | ---------------- | ----------------------------- |
+| React                              | 19.1.0     | 前端框架         |                               |
+| TypeScript                         | 5.8.3      | 类型系统         |                               |
+| Tauri                              | 2.0.0      | 桌面应用框架     | 需配置 capabilities           |
+| Zustand                            | 5.0.9      | 状态管理         |                               |
+| **Tailwind CSS**                   | **4.1.18** | **CSS 框架**     | **使用 @theme，非 config.js** |
+| shadcn/ui                          | latest     | UI 组件库        | 需适配 Tailwind 4             |
+| Biome                              | 2.3.8      | 代码规范和格式化 |                               |
+| @tauri-apps/plugin-global-shortcut | 2.3.1      | 全局快捷键支持   |                               |
 
 ## 项目结构
 
 ```
 ├── src/
-│   ├── components/          # 组件目录
-│   │   ├── Settings.tsx     # 设置页面组件
-│   │   └── ShortcutItem.tsx # 快捷键配置项组件
-│   ├── hooks/               # 自定义 Hooks
-│   │   └── useShortcut.ts   # 快捷键监听 Hook
-│   ├── store/               # 状态管理
-│   │   ├── appStore.ts      # 应用状态
-│   │   └── shortcutStore.ts # 快捷键配置
-│   ├── types/               # 类型定义
-│   │   └── shortcut.ts      # 快捷键相关类型
-│   ├── utils/               # 工具函数
-│   │   └── logger.ts        # 环境感知的日志工具
-│   ├── App.tsx              # 主应用组件
-│   ├── index.css            # 全局样式（Tailwind 4 配置）
-│   └── main.tsx             # 应用入口
-├── src-tauri/               # Tauri 相关代码
-│   ├── src/                 # Rust 源代码
-│   │   ├── lib.rs           # 主逻辑（窗口管理命令）
-│   │   └── main.rs          # 入口文件
-│   └── tauri.conf.json      # Tauri 配置文件
-├── .biomeignore             # Biome 忽略文件
-├── biome.json               # Biome 配置
-├── postcss.config.js        # PostCSS 配置
-└── package.json             # 项目依赖和脚本
+│   ├── components/              # UI 组件
+│   │   ├── ui/                  # shadcn/ui 组件
+│   │   │   ├── command.tsx      # Command 组件（插件搜索）
+│   │   │   ├── card.tsx
+│   │   │   ├── button.tsx
+│   │   │   ├── badge.tsx
+│   │   │   └── ...
+│   │   ├── Settings.tsx         # 设置页面
+│   │   └── PluginWindow.tsx     # 插件结果窗口（已废弃，用独立窗口）
+│   ├── plugins/                 # 插件系统
+│   │   ├── types.ts             # 插件类型定义
+│   │   ├── registry.ts          # 插件注册表
+│   │   ├── matcher.ts           # 插件匹配引擎
+│   │   └── builtin/             # 内置插件
+│   │       ├── calculator/      # 计算器插件
+│   │       └── translate/       # 翻译插件
+│   ├── hooks/
+│   │   ├── useShortcut.ts       # 快捷键监听
+│   │   └── usePluginMatcher.ts  # 插件匹配 Hook
+│   ├── store/
+│   │   ├── appStore.ts          # 应用状态
+│   │   ├── shortcutStore.ts     # 快捷键配置
+│   │   ├── pluginStore.ts       # 插件状态
+│   │   └── searchStore.ts       # 搜索状态
+│   ├── lib/
+│   │   └── utils.ts             # shadcn 工具函数 (cn)
+│   ├── App.tsx                  # 主窗口应用
+│   ├── PluginWindow.tsx         # 插件窗口组件
+│   ├── plugin-main.tsx          # 插件窗口入口
+│   ├── index.css                # 全局样式（Tailwind 4 + shadcn）
+│   └── main.tsx                 # 主窗口入口
+├── src-tauri/
+│   ├── capabilities/            # Tauri 权限配置
+│   │   └── plugin-window.json   # 插件窗口权限
+│   ├── src/
+│   │   ├── lib.rs               # 窗口管理命令
+│   │   └── main.rs
+│   └── tauri.conf.json
+├── plugin-result.html           # 插件窗口 HTML
+├── index.html                   # 主窗口 HTML
+├── vite.config.ts               # Vite 多页面配置
+└── components.json              # shadcn 配置
 ```
 
 ## 核心功能
 
-### 1. 快捷键系统 ⌨️
+### 1. 插件系统 🔌
 
 #### 设计思路
 
-- 采用 Zustand 管理快捷键配置，支持持久化存储
-- 使用 Tauri 的 `@tauri-apps/plugin-global-shortcut` 实现全局快捷键监听
-- 支持动态注册和更新快捷键，修改后立即生效
-- 状态机模式防止快捷键重复触发（按下/松开都会触发的问题）
+类似 uTools 的插件架构：
 
-#### 实现细节
+- 用户输入 → 智能匹配插件 → 执行插件 → 独立窗口显示结果
+- 支持关键词、正则、模糊三种匹配方式
+- 插件独立窗口显示结果（不是 React modal）
 
-##### 状态管理 (`shortcutStore.ts`)
-
-- 使用 Zustand 和 persist 中间件，将快捷键配置保存到 localStorage
-- **版本控制机制**：每次更新快捷键时递增 `version` 字段，触发自动重新注册
-- 支持重置为默认配置
+#### 插件类型定义 (`plugins/types.ts`)
 
 ```typescript
-interface ShortcutStore {
-  shortcuts: ShortcutConfig;
-  version: number; // 用于触发重新注册
-  updateShortcut: (action: string, key: string, modifiers: string[]) => void;
-  resetShortcuts: () => void;
+interface Plugin {
+  id: string;
+  name: string;
+  description: string;
+  icon?: ReactNode;
+  config: PluginConfig;
+  execute: (context: PluginContext) => void | Promise<void>;
+  getPreview?: (input: string) => ReactNode;
+}
+
+interface PluginConfig {
+  keywords?: string[]; // 关键词匹配
+  pattern?: RegExp; // 正则匹配
+  fuzzy?: boolean; // 模糊搜索
+  priority?: number; // 优先级
+  featured?: boolean; // 精选标记
+  enabled?: boolean;
 }
 ```
 
-##### 快捷键监听 (`useShortcut.ts`)
+#### 插件注册表 (`plugins/registry.ts`)
 
-- **状态机模式**：通过 `keyPressState` Map 追踪每个快捷键的按下/松开状态
-  - 第一次触发（按下）→ 执行操作
-  - 第二次触发（松开）→ 忽略
-  - 第三次触发（再次按下）→ 执行操作
-- **自动重新注册**：监听 `version` 变化，快捷键配置更新后自动重新注册
-- **Hot Reload 友好**：不在 cleanup 中注销快捷键，避免开发时 hot reload 导致快捷键失效
-- **单例模式**：使用全局 `globalShortcutManager` 确保快捷键只被注册一次
-
-##### 默认快捷键
-
-- `Cmd+Shift+Space`：显示/隐藏主窗口
-- `Cmd+Shift+S`：打开设置页面
-- `Escape`：关闭窗口
-
-#### 关键问题和解决方案
-
-**问题 1：快捷键被触发两次**
-
-- **原因**：Tauri 全局快捷键在按下和松开时都会触发回调
-- **解决方案**：使用状态机模式，第一次触发执行，第二次触发忽略
-
-**问题 2：修改快捷键后需要刷新才能生效**
-
-- **原因**：快捷键配置更新后没有自动重新注册
-- **解决方案**：添加 `version` 字段，配置变化时递增版本号，`useEffect` 监听版本变化触发重新注册
-
-**问题 3：Hot Reload 后快捷键失效**
-
-- **原因**：`useEffect` cleanup 中调用 `cleanupShortcuts()` 导致快捷键被注销
-- **解决方案**：移除 cleanup 中的快捷键注销逻辑，只在重新注册前清理
-
-### 2. 主窗口设计 🪟
-
-#### 设计思路
-
-- 以输入框为核心，简洁高效
-- 支持通过快捷键呼出/隐藏
-- 点击窗口外部或按 Escape 自动关闭
-- 透明背景，无边框设计
-- **动态窗口高度**：根据内容自动调整窗口大小
-
-#### 实现细节
-
-##### 窗口状态管理 (`appStore.ts`)
-
-- 管理窗口的显示/隐藏状态（`isWindowVisible`）
-- 管理设置面板的打开/关闭状态（`isSettingsOpen`）
-- 提供 Tauri 命令调用接口（`toggleWindow`, `showWindow`, `hideWindow`）
-
-##### 动态窗口高度 (`App.tsx`)
-
-使用 `ResizeObserver` 监听内容高度变化，自动调用 Tauri 的 `set_window_size` 命令：
+单例模式管理所有插件：
 
 ```typescript
-useEffect(() => {
-  if (!contentRef.current) return;
+class PluginRegistry {
+  register(plugin: Plugin): void;
+  unregister(pluginId: string): void;
+  getAllPlugins(): Plugin[];
+  getPlugin(id: string): Plugin | undefined;
+}
 
-  const resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      const height = entry.contentRect.height;
-      const width = 600;
-      invoke("set_window_size", { width, height });
-    }
-  });
-
-  resizeObserver.observe(contentRef.current);
-  return () => resizeObserver.disconnect();
-}, []);
+export const pluginRegistry = new PluginRegistry();
 ```
 
-##### 交互逻辑
+#### 插件匹配引擎 (`plugins/matcher.ts`)
 
-- 输入完成后按 Enter 键提交
-- 点击窗口外部自动关闭
-- 按 Escape 键关闭窗口
-- 平滑的显示/隐藏动画（使用 Tailwind CSS transition）
+智能匹配算法：
 
-### 3. 设置页面 ⚙️
-
-#### 设计思路
-
-- 可视化的快捷键配置界面
-- 支持修饰键（Cmd、Ctrl、Shift、Alt）的组合
-- **快捷键冲突检测**：防止设置重复的快捷键
-- **输入验证**：只允许有效的键名（A-Z、0-9、Space、Enter 等）
-- 实时保存配置
-- 支持重置为默认值
-
-#### 实现细节
-
-##### 组件设计
-
-- **`Settings.tsx`**：设置页面主组件
-  - 快捷键冲突检测逻辑
-  - 输入验证逻辑（`VALID_KEYS` 列表）
-- **`ShortcutItem.tsx`**：可复用的快捷键配置项组件
-  - 封装编辑逻辑和 UI
-  - 减少代码重复（重构后减少了 66 行代码）
-
-##### 冲突检测
+1. **关键词匹配**：精确匹配，分数 100
+2. **正则匹配**：模式匹配，分数 90
+3. **模糊搜索**：Fuzzy 算法，分数 0-80
 
 ```typescript
-const checkConflict = (
-  action: string,
-  key: string,
-  modifiers: string[]
-): boolean => {
-  const newAccelerator = `${modifiers.join("+")}+${key}`;
-
-  for (const [existingAction, shortcut] of Object.entries(shortcuts)) {
-    if (existingAction === action) continue;
-    const existingAccelerator = `${shortcut.modifiers.join("+")}+${
-      shortcut.key
-    }`;
-    if (existingAccelerator === newAccelerator) return true;
-  }
-  return false;
-};
+class PluginMatcher {
+  match(query: string, plugins: Plugin[]): MatchResult[];
+}
 ```
 
-##### 输入验证
+#### 内置插件示例
+
+**计算器插件** (`plugins/builtin/calculator`):
+
+- 匹配：数学表达式（`/^[\d+\-*/().\s]+$/`）
+- 执行：计算结果并显示
+
+**翻译插件** (`plugins/builtin/translate`):
+
+- 关键词：`['翻译', 'translate', 'fy']`
+- 执行：调用翻译 API
+
+### 2. 独立窗口系统 🪟
+
+#### 设计架构
+
+```
+主窗口 (main)              插件窗口 (plugin-window)
+┌─────────────┐            ┌──────────────────┐
+│ 搜索框      │            │ 插件结果展示     │
+│ 插件列表    │ ────────> │ + 操作按钮       │
+└─────────────┘            └──────────────────┘
+      ↑                            │
+      └────────关闭后重新聚焦──────┘
+```
+
+#### Rust 窗口命令 (`lib.rs`)
+
+```rust
+#[tauri::command]
+async fn create_plugin_window(
+    app: tauri::AppHandle,
+    data: PluginData,  // 插件ID、名称、输入、结果
+) -> Result<(), String>
+
+#[tauri::command]
+async fn close_plugin_window(app: tauri::AppHandle) -> Result<(), String>
+```
+
+**关键实现**：
+
+- ✅ 延迟 300ms 发送数据（等待窗口加载）
+- ✅ 主窗口不隐藏，只失去焦点（避免空白问题）
+- ✅ 使用 Tauri Events 通信
+
+#### Tauri Capabilities 配置
+
+**为什么需要**：Tauri 2 默认只允许 `main` 窗口监听事件
+
+**解决方案**：创建 `src-tauri/capabilities/plugin-window.json`
+
+```json
+{
+  "identifier": "plugin-window",
+  "windows": ["plugin-window"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-emit"]
+}
+```
+
+#### Vite 多页面配置
 
 ```typescript
-const VALID_KEYS = [
-  'A', 'B', 'C', ..., 'Z',  // 字母
-  '0', '1', ..., '9',        // 数字
-  'Space', 'Enter', 'Tab', 'Escape',  // 特殊键
-  'F1', 'F2', ..., 'F12'     // 功能键
-]
+// vite.config.ts
+build: {
+  rollupOptions: {
+    input: {
+      main: path.resolve(__dirname, 'index.html'),
+      plugin: path.resolve(__dirname, 'plugin-result.html'),
+    },
+  },
+}
 ```
 
-## 样式系统 🎨
+### 3. shadcn/ui 集成 🎨
 
-### Tailwind CSS 4 配置
+#### 为什么用 shadcn？
 
-项目使用最新的 Tailwind CSS 4，配置方式与 v3 有重大变化：
+- ✅ 组件化、可维护
+- ✅ 完美的键盘导航支持
+- ✅ 内置无障碍功能
+- ✅ Command 组件非常适合插件搜索
 
-#### 配置文件 (`index.css`)
+#### 已安装组件
 
-使用新的 `@theme` 语法定义自定义颜色和动画：
+- `Command` - 插件搜索界面（核心）
+- `Card`, `Button`, `Badge`, `Separator` - 设置和结果展示
+- `Dialog` - 对话框
+
+#### Tailwind 4 + shadcn 适配
+
+**关键点**：shadcn 默认用 Tailwind 3，需要适配 Tailwind 4
+
+**index.css 配置**：
 
 ```css
 @import "tailwindcss";
 
+/* shadcn CSS 变量 */
 @theme {
-  /* 自定义颜色 */
-  --color-primary: #3b82f6;
-  --color-secondary: #2563eb;
+  --color-background: 0 0% 100%;
+  --color-foreground: 222.2 84% 4.9%;
+  --color-primary: 221.2 83.2% 53.3%;
+  /* ... 更多 shadcn 颜色 ... */
 
-  /* 动画 */
-  --animate-slide-in: slideIn 0.2s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  --radius-lg: 0.5rem;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
 }
 ```
 
-> ⚠️ **注意**：Tailwind 4 不再需要 `tailwind.config.js` 文件，所有配置都在 CSS 中完成！
+> ⚠️ **重要**：不要创建 `tailwind.config.js`！Tailwind 4 所有配置都在 CSS 的 `@theme` 中。
 
-#### PostCSS 配置
+**PostCSS 配置**：
 
 ```javascript
 export default {
@@ -252,457 +255,175 @@ export default {
 };
 ```
 
-## 日志系统 📝
+### 4. 快捷键系统 ⌨️
 
-### 环境感知的日志工具 (`logger.ts`)
+（保留原有内容，略）
 
-为了优化生产环境性能和安全性，创建了环境感知的日志工具：
+### 5. 状态管理 📦
 
-```typescript
-const isDev = import.meta.env.DEV;
-
-export const logger = {
-  log: (...args) => isDev && console.log(...args), // 仅开发环境
-  warn: (...args) => isDev && console.warn(...args), // 仅开发环境
-  error: (...args) => console.error(...args), // 始终记录
-  info: (...args) => isDev && console.info(...args), // 仅开发环境
-};
-```
-
-**使用示例**：
+#### pluginStore (Zustand)
 
 ```typescript
-// ❌ 不推荐：直接使用 console
-console.log("调试信息");
-
-// ✅ 推荐：使用 logger
-logger.log("调试信息");
+{
+  activePlugin: Plugin | null        // 当前激活的插件
+  matchedPlugins: MatchResult[]      // 匹配的插件列表
+  pluginMetadata: Record<string, {   // 插件元数据
+    usageCount: number
+    lastUsed: number
+  }>
+}
 ```
 
-**优势**：
+#### searchStore (Zustand)
 
-- 开发环境：显示详细的调试信息
-- 生产环境：只显示错误信息，减少日志输出
-- 提升性能和安全性
+```typescript
+{
+  query: string; // 搜索关键词
+  selectedIndex: number; // 选中的插件索引
+  extractedInput: string; // 提取的输入
+  showPluginList: boolean; // 是否显示列表
+}
+```
 
-## Rust 后端 🦀
+## 工作流程示例
 
-### 窗口管理命令 (`lib.rs`)
+### 用户使用计算器插件
 
-提供了以下 Tauri 命令供前端调用：
+```
+1. 按 Cmd+Shift+Space 呼出主窗口
+2. 输入 "2+3"
+   ↓
+3. usePluginMatcher 监听query变化
+   ↓
+4. PluginMatcher 匹配到计算器插件（正则匹配）
+   ↓
+5. Command 组件显示匹配结果
+   ↓
+6. 用户按 Enter 或点击
+   ↓
+7. executePlugin() 调用 Tauri 命令 create_plugin_window
+   ↓
+8. Rust 创建插件窗口，延迟300ms发送数据
+   ↓
+9. PluginWindow.tsx 监听 "plugin-data" 事件
+   ↓
+10. 显示结果 "2+3 = 5"
+   ↓
+11. 用户点击关闭，调用 close_plugin_window
+   ↓
+12. 主窗口重新聚焦
+```
+
+## 常见问题和解决方案 ❓
+
+### 插件相关
+
+**Q: 插件窗口一直显示 Loading？**
+
+A: 权限问题。需要创建 `capabilities/plugin-window.json` 授予事件监听权限。
+
+**Q: 插件数据没有传到窗口？**
+
+A: 时序问题。Rust 需要延迟发送数据：
 
 ```rust
-#[tauri::command]
-async fn show_window(window: tauri::Window) -> Result<(), String>
-
-#[tauri::command]
-async fn hide_window(window: tauri::Window) -> Result<(), String>
-
-#[tauri::command]
-async fn toggle_window_visibility(window: tauri::Window) -> Result<(), String>
-
-#[tauri::command]
-async fn set_window_size(window: tauri::Window, width: f64, height: f64) -> Result<(), String>
+std::thread::spawn(move || {
+    std::thread::sleep(Duration::from_millis(300));
+    window_clone.emit("plugin-data", &data_clone)
+});
 ```
 
-**关键实现**：
+**Q: 主窗口再次呼出时变空白？**
 
-- `show_window` / `hide_window`：显示/隐藏窗口
-- `toggle_window_visibility`：切换窗口可见性（先检查当前状态再操作）
-- `set_window_size`：动态调整窗口大小（支持前端内容自适应）
+A: 不要隐藏主窗口，只让它失去焦点。
 
-## 代码规范 ✨
+### shadcn/ui 相关
 
-### Biome 配置
+**Q: 为什么不能创建 tailwind.config.js？**
 
-使用 Biome 进行代码检查和格式化，配置文件 `biome.json`：
+A: 项目使用 Tailwind 4，配置在 `index.css` 的 `@theme` 中。如果创建了 config 文件会导致配置冲突。
 
-```json
-{
-  "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100
+**Q: Command 组件不显示匹配结果？**
+
+A: 需要添加 `shouldFilter={false}`，否则 cmdk 会自己过滤：
+
+```tsx
+<Command shouldFilter={false}>
+```
+
+### Tauri 相关
+
+**Q: event.listen not allowed on window "plugin-window"？**
+
+A: 需要在 `capabilities/` 目录创建权限配置文件。
+
+## 开发最佳实践 💡
+
+### 1. 添加新插件
+
+```typescript
+// 1. 创建插件文件
+// src/plugins/builtin/my-plugin/index.tsx
+
+export const myPlugin: Plugin = {
+  id: "my-plugin",
+  name: "我的插件",
+  description: "插件描述",
+  config: {
+    keywords: ["关键词"],
+    priority: 90,
   },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "a11y": {
-        "noAutofocus": "off" // 允许 autoFocus
-      },
-      "suspicious": {
-        "noExplicitAny": "off" // 允许 any（window 对象需要）
-      }
-    }
+  execute: (context) => {
+    // 插件逻辑
+    context.showNotification("结果");
   },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "trailingCommas": "all",
-      "semicolons": "asNeeded"
-    }
-  }
-}
+};
+
+// 2. 注册插件
+// src/App.tsx
+pluginRegistry.register(myPlugin);
 ```
 
-### .biomeignore
+### 2. 使用 logger 而不是 console
 
-排除不需要检查的文件：
+```typescript
+// ❌ 不推荐
+console.log("debug info");
 
-```
-src/index.css
-**/*.css
-```
-
-> 💡 **提示**：Biome 目前不支持 Tailwind 4 的 `@theme` 语法，所以需要忽略 CSS 文件。
-
-### 脚本命令
-
-```json
-{
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "format": "biome format ./src --write",
-    "lint": "biome lint ./src",
-    "lint:fix": "biome lint ./src --write"
-  }
-}
+// ✅ 推荐
+logger.log("debug info"); // 只在开发环境显示
 ```
 
-### 为什么只检查 src 目录？
+### 3. 确保 Tailwind 4 配置正确
 
-1. **提高速度**：只检查源代码目录可以大大提高 Biome 的运行速度，避免检查大量的依赖文件和构建产物
-2. **减少噪音**：避免检查与项目开发无关的文件，减少不必要的错误和警告
-3. **针对性强**：只关注项目的核心代码，确保源代码符合规范
-4. **开发友好**：快速的检查反馈有助于在开发过程中保持代码质量
+**不要创建**：
 
-建议在开发过程中定期运行以下命令：
+- ❌ `tailwind.config.js`
+- ❌ `tailwind.config.ts`
 
-```bash
-# 检查源代码规范
-pnpm run lint
+**只配置**：
 
-# 自动修复规范问题
-pnpm run lint:fix
+- ✅ `index.css` 中的 `@theme`
+- ✅ `postcss.config.js`
 
-# 格式化源代码
-pnpm run format
-```
+## 技术债务和改进
 
-## 开发和构建 🛠️
+### 已完成 ✅
 
-### 开发
-
-```bash
-# 安装依赖
-pnpm install
-
-# 启动开发服务器（支持 hot reload）
-pnpm tauri dev
-```
-
-### 构建
-
-```bash
-# 构建前端
-pnpm run build
-
-# 打包 Tauri 应用
-pnpm tauri build
-```
-
-## 使用说明 📖
-
-### 1. 快捷键
-
-| 功能            | 默认快捷键      | 说明                       |
-| --------------- | --------------- | -------------------------- |
-| 显示/隐藏主窗口 | Cmd+Shift+Space | 呼出或隐藏应用的主输入窗口 |
-| 打开设置        | Cmd+Shift+S     | 打开快捷键配置页面         |
-| 关闭窗口        | Escape          | 关闭当前窗口               |
-
-> 💡 **提示**：所有快捷键都可以在设置页面自定义！
-
-### 2. 主窗口
-
-- 输入内容后按 Enter 键提交
-- 提交后窗口自动关闭
-- 点击窗口外部或按 Escape 也可以关闭窗口
-- 窗口高度会根据内容自动调整
-
-### 3. 设置页面
-
-- 点击快捷键右侧的 "Edit" 按钮进行编辑
-- 选择修饰键（Cmd、Ctrl、Shift、Alt）
-- 输入单个字母、数字或特殊键作为快捷键
-- 点击 "Save" 保存，"Cancel" 取消编辑
-- 点击 "Reset to Defaults" 恢复默认快捷键
-
-**限制**：
-
-- 必须至少选择一个修饰键
-- 只能使用有效的键名（A-Z、0-9、Space、Enter、Tab、Escape、F1-F12）
-- 不能设置与其他功能冲突的快捷键
-
-## 常见问题 ❓
-
-### 1. 应用启动后显示灰色窗口
-
-**原因**：窗口配置或样式问题
-
-**解决方案**：
-
-- 检查 `tauri.conf.json` 中的窗口配置
-- 确保 `transparent: true` 和 `decorations: false` 已正确设置
-- 检查 CSS 样式，确保背景色为透明
-
-### 2. 快捷键不生效
-
-**可能原因**：
-
-- 快捷键与系统或其他应用冲突
-- 插件未正确安装或配置
-- 代码错误
-
-**解决方案**：
-
-1. 尝试修改快捷键（避免与系统快捷键冲突）
-2. 检查 `src-tauri/Cargo.toml` 中是否添加了 `tauri-plugin-global-shortcut` 依赖
-3. 检查控制台是否有错误日志
-4. 尝试重启应用
-
-### 3. Hot Reload 后快捷键失效
-
-**原因**：已修复！之前版本存在这个问题。
-
-**当前状态**：✅ 已通过优化 `useShortcut.ts` 的 cleanup 逻辑修复，hot reload 不会影响快捷键。
-
-### 4. 快捷键被触发两次
-
-**原因**：已修复！Tauri 全局快捷键在按下和松开时都会触发。
-
-**当前状态**：✅ 已通过状态机模式修复，只在按下时执行操作。
-
-### 5. 修改快捷键后需要刷新才能生效
-
-**原因**：已修复！之前版本需要手动刷新。
-
-**当前状态**：✅ 已通过版本控制机制修复，修改后立即生效。
-
-### 6. 构建失败
-
-**可能原因**：
-
-- TypeScript 错误
-- Tailwind CSS 配置错误
-- 依赖问题
-
-**解决方案**：
-
-1. 运行 `pnpm run build` 查看详细错误信息
-2. 检查 TypeScript 错误：`tsc --noEmit`
-3. 确认 Tailwind CSS 和 PostCSS 配置正确
-4. 清理并重新安装依赖：`rm -rf node_modules && pnpm install`
-
-### 7. CSS Lint 警告：Unknown at rule @theme
-
-**原因**：Biome 目前不支持 Tailwind 4 的 `@theme` 语法
-
-**解决方案**：已通过 `.biomeignore` 排除 CSS 文件检查。这不影响功能，颜色定义工作正常。
-
-## 扩展指南 🔧
-
-### 添加新的快捷键
-
-1. **定义类型** (`src/types/shortcut.ts`)：
-
-   ```typescript
-   export type ShortcutAction =
-     | "toggleWindow"
-     | "openSettings"
-     | "yourNewAction";
-   ```
-
-2. **添加默认配置** (`src/store/shortcutStore.ts`)：
-
-   ```typescript
-   const defaultShortcuts: ShortcutConfig = {
-     // ...existing shortcuts
-     yourNewAction: {
-       key: "N",
-       modifiers: ["Cmd", "Shift"],
-     },
-   };
-   ```
-
-3. **注册快捷键** (`src/hooks/useShortcut.ts`)：
-
-   ```typescript
-   // 在 registerShortcuts 函数中添加
-   await register(yourNewAccelerator, async () => {
-     // 你的逻辑
-     await yourAction();
-   });
-   ```
-
-4. **在设置页面添加配置项** (`src/components/Settings.tsx`)：
-   ```tsx
-   <ShortcutItem
-     title="Your New Action"
-     description="Description of your action"
-     currentKey={shortcuts.yourNewAction.key}
-     currentModifiers={shortcuts.yourNewAction.modifiers}
-     onSave={(key, modifiers) =>
-       handleSaveShortcut("yourNewAction", key, modifiers)
-     }
-   />
-   ```
-
-### 自定义主题
-
-在 `src/index.css` 文件中的 `@theme` 块中修改：
-
-```css
-@theme {
-  /* 修改主色调 */
-  --color-primary: #your-color;
-  --color-secondary: #your-color;
-
-  /* 添加新颜色 */
-  --color-accent: #your-color;
-  --color-warning: #your-color;
-
-  /* 添加新动画 */
-  --animate-fade-in: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-```
-
-### 添加新功能
-
-1. **创建组件或页面**：在 `src/components/` 中创建新组件
-2. **添加状态管理**：在 `src/store/` 中创建或扩展 store
-3. **添加快捷键**：按照"添加新的快捷键"步骤操作
-4. **实现逻辑**：在组件中实现功能
-5. **添加样式**：使用 Tailwind CSS 类名
-
-### Rust 后端扩展
-
-如果需要添加新的 Tauri 命令：
-
-1. **定义命令** (`src-tauri/src/lib.rs`)：
-
-   ```rust
-   #[tauri::command]
-   async fn your_command(param: String) -> Result<String, String> {
-       // 你的逻辑
-       Ok("Success".to_string())
-   }
-   ```
-
-2. **注册命令**：
-
-   ```rust
-   .invoke_handler(tauri::generate_handler![
-       // ...existing commands
-       your_command
-   ])
-   ```
-
-3. **前端调用**：
-
-   ```typescript
-   import { invoke } from "@tauri-apps/api/core";
-
-   const result = await invoke("your_command", { param: "value" });
-   ```
-
-## 最佳实践 💡
-
-### 1. 日志记录
-
-- ✅ 使用 `logger.log()` 而不是 `console.log()`
-- ✅ 在关键操作前后记录日志
-- ✅ 使用 emoji 前缀增加可读性（如 `🔧`、`✅`、`❌`）
-
-### 2. 错误处理
-
-- ✅ 使用 try-catch 包裹异步操作
-- ✅ 向用户显示友好的错误信息
-- ✅ 记录详细的错误日志以便调试
-
-### 3. 性能优化
-
-- ✅ 使用 `useCallback` 包裹回调函数以避免不必要的重新渲染
-- ✅ 使用 `useMemo` 缓存计算结果
-- ✅ 避免在循环中创建函数
-
-### 4. 代码组织
-
-- ✅ 保持组件单一职责
-- ✅ 提取可复用的组件（如 `ShortcutItem`）
-- ✅ 使用 TypeScript 类型确保类型安全
-
-### 5. 开发体验
-
-- ✅ 定期运行 `pnpm run lint:fix` 自动修复代码规范问题
-- ✅ 使用 `logger` 而不是 `console` 以支持环境感知
-- ✅ 在修改快捷键系统时，测试 hot reload 是否仍然正常
-
-## 技术债务和改进方向 🚀
-
-### 已解决的问题 ✅
-
-- ✅ 快捷键重复触发问题（状态机模式）
-- ✅ Hot Reload 后快捷键失效（优化 cleanup 逻辑）
-- ✅ 快捷键修改后需要刷新（版本控制机制）
-- ✅ 快捷键冲突检测
-- ✅ 输入验证
-- ✅ 代码重复（提取 ShortcutItem 组件）
-- ✅ 生产环境日志过多（logger 工具）
+- ✅ 插件系统基础架构
+- ✅ 插件独立窗口
+- ✅ shadcn/ui 集成
+- ✅ 智能插件匹配
+- ✅ 快捷键系统
 - ✅ 动态窗口高度
 
-### 未来改进方向 🎯
+### 待改进 🎯
 
-1. **功能增强**
-
-   - [ ] 添加键盘快捷键提示 UI
-   - [ ] 支持快捷键配置导入/导出
-   - [ ] 添加历史记录功能
-   - [ ] 支持插件系统
-
-2. **用户体验**
-
-   - [ ] 添加深色/浅色主题切换
-   - [ ] 自定义窗口宽度
-   - [ ] 更多动画效果
-   - [ ] 多语言支持
-
-3. **性能优化**
-
-   - [ ] 减少重新渲染次数
-   - [ ] 优化启动速度
-   - [ ] 减小打包体积
-
-4. **开发体验**
-   - [ ] 添加单元测试
-   - [ ] 添加 E2E 测试
-   - [ ] 完善 CI/CD 流程
-   - [ ] 添加更多 debug 工具
+- [ ] 插件配置界面
+- [ ] 插件市场
+- [ ] 更多内置插件
+- [ ] 插件开发文档
+- [ ] 单元测试
 
 ## 许可证
 
@@ -710,4 +431,9 @@ MIT
 
 ---
 
-> 🎉 **提示**：这个项目是一个持续迭代的示例，展示了如何构建一个现代化的桌面应用。欢迎提交 PR 和 Issue！
+> 💡 **给 AI Agent 的提示**：
+>
+> - 本项目使用 **Tailwind 4**，不要创建 config 文件！
+> - shadcn 组件需要适配 Tailwind 4 的 `@theme` 语法
+> - Tauri 2 需要配置 capabilities 权限
+> - 插件窗口需要延迟发送数据（300ms）

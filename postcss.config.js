@@ -1,15 +1,20 @@
 export default {
   plugins: {
     '@tailwindcss/postcss': {
-      // Tailwind CSS 4配置
+      // Tailwind CSS 4 配置
       content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
       theme: {
         extend: {
-          colors: {
-            primary: '#6366f1',
-            secondary: '#4f46e5',
-            danger: '#ef4444',
-            success: '#10b981',
+          // 动画名称映射
+          keyframes: {
+            'accordion-down': {
+              from: { height: '0' },
+              to: { height: 'var(--radix-accordion-content-height)' },
+            },
+            'accordion-up': {
+              from: { height: 'var(--radix-accordion-content-height)' },
+              to: { height: '0' },
+            },
           },
         },
       },

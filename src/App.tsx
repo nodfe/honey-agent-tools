@@ -1,43 +1,147 @@
 import { invoke } from '@tauri-apps/api/core'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Settings from './components/Settings'
 import { useShortcut } from './hooks/useShortcut'
+import { usePluginMatcher } from './hooks/usePluginMatcher'
 import { useAppStore } from './store/appStore'
+import { usePluginStore } from './store/pluginStore'
+import { useSearchStore } from './store/searchStore'
+import { pluginRegistry } from './plugins/registry'
+import { translatePlugin } from './plugins/builtin/translate'
+import { calculatorPlugin } from './plugins/builtin/calculator'
 import { logger } from './utils/logger'
+import type { MatchResult, PluginResult } from './plugins/types'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { Badge } from '@/components/ui/badge'
 
 function App() {
-  const [inputValue, setInputValue] = useState('')
   const isWindowVisible = useAppStore((state) => state.isWindowVisible)
   const isSettingsOpen = useAppStore((state) => state.isSettingsOpen)
   const hideWindow = useAppStore((state) => state.hideWindow)
   const contentRef = useRef<HTMLDivElement>(null)
 
+  // 搜索和插件状态
+  const query = useSearchStore((state) => state.query)
+  const setQuery = useSearchStore((state) => state.setQuery)
+  const selectedIndex = useSearchStore((state) => state.selectedIndex)
+  const reset = useSearchStore((state) => state.reset)
+
+  const matchedPlugins = usePluginStore((state) => state.matchedPlugins)
+  const activePlugin = usePluginStore((state) => state.activePlugin)
+  const setActivePlugin = usePluginStore((state) => state.setActivePlugin)
+
   // 初始化快捷键
   useShortcut()
 
-  // 应用启动时的初始化逻辑已移除
-  // 窗口默认状态由 Tauri 应用配置控制，不再在 React 中重复设置
+  // 初始化插件匹配
+  usePluginMatcher()
 
-  // 处理输入框提交
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    logger.log('Input submitted:', inputValue)
-    setInputValue('')
-    hideWindow()
+  // 注册内置插件
+  useEffect(() => {
+    logger.log('📦 Registering built-in plugins...')
+    pluginRegistry.register(translatePlugin)
+    pluginRegistry.register(calculatorPlugin)
+    logger.log('✅ Built-in plugins registered')
+  }, [])
+
+  // 执行插件
+  const executePlugin = async (match: MatchResult) => {
+    logger.log(`🚀 Executing plugin: ${match.plugin.name}`)
+
+    setActivePlugin(match.plugin)
+
+    // 创建插件上下文
+    const context = {
+      input: match.extractedInput,
+      rawInput: query,
+      platform: 'mac' as const,
+
+      showNotification: (message: string) => {
+        logger.log(`📢 [showNotification] ${message}`)
+        // 收集结果，稍后传递给窗口
+        return {
+          type: 'text' as const,
+          content: message,
+        }
+      },
+
+      copyToClipboard: async (text: string) => {
+        await navigator.clipboard.writeText(text)
+        logger.log(`📋 Copied to clipboard: ${text}`)
+      },
+
+      openURL: async (url: string) => {
+        window.open(url, '_blank')
+      },
+
+      hideWindow: async () => {
+        await hideWindow()
+      },
+
+      showResult: (result: PluginResult) => {
+        logger.log('📊 Plugin result:', result)
+        return result
+      },
+    }
+
+    // 执行插件并获取结果
+    let result: any
+    try {
+      result = await match.plugin.execute(context)
+      
+      // 如果插件没有显式返回结果，使用默认格式
+      if (!result) {
+        result = {
+          type: 'text',
+          content: '插件执行完成',
+        }
+      }
+    } catch (error) {
+      logger.error('❌ Plugin execution failed:', error)
+      result = {
+        type: 'text',
+        content: `插件执行失败: ${error}`,
+      }
+    }
+
+    // 调用 Tauri 命令创建插件窗口
+    try {
+      await invoke('create_plugin_window', {
+        data: {
+          plugin_id: match.plugin.id,
+          plugin_name: match.plugin.name,
+          input: match.extractedInput,
+          result,
+        },
+      })
+    } catch (error) {
+      logger.error('❌ Failed to create plugin window:', error)
+    }
   }
 
   // ESC 键关闭窗口
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isWindowVisible) {
-        logger.log('🔑 [ESC] ESC 键按下，关闭窗口')
-        hideWindow()
+        if (query) {
+          reset()
+        } else {
+          logger.log('🔑 [ESC] ESC 键按下，关闭窗口')
+          hideWindow()
+        }
       }
     }
 
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [isWindowVisible, hideWindow])
+  }, [isWindowVisible, hideWindow, query, reset])
 
   // 动态调整窗口高度
   useEffect(() => {
@@ -46,11 +150,10 @@ function App() {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const height = entry.contentRect.height
-        const width = 600 // 固定宽度
+        const width = 600
 
         logger.log(`📏 [窗口尺寸] 内容高度变化: ${height}px`)
 
-        // 调用 Tauri 命令调整窗口大小
         invoke('set_window_size', { width, height })
           .then(() => {
             logger.log(`✅ [窗口尺寸] 窗口大小已调整: ${width}x${height}`)
@@ -92,18 +195,72 @@ function App() {
         {isSettingsOpen ? (
           <Settings />
         ) : (
-          <form onSubmit={handleSubmit} className="w-full max-w-[600px] px-5">
-            <div className="w-full relative">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Enter your query..."
-                className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl outline-none transition-all duration-200 bg-white shadow-lg focus:border-primary focus:ring-2 focus:ring-primary/10"
-                autoFocus
+          <div className="w-full max-w-[600px] px-5">
+            <Command className="rounded-lg border shadow-md" shouldFilter={false}>
+              <CommandInput
+                placeholder="输入关键词搜索插件..."
+                value={query}
+                onValueChange={setQuery}
               />
-            </div>
-          </form>
+              <CommandList>
+                {matchedPlugins.length === 0 && query ? (
+                  <CommandEmpty>没有找到匹配的插件</CommandEmpty>
+                ) : matchedPlugins.length > 0 ? (
+                  <CommandGroup heading="匹配的插件">
+                    {matchedPlugins.map((match, index) => (
+                      <CommandItem
+                        key={match.plugin.id}
+                        value={match.plugin.id}
+                        onSelect={() => {
+                          executePlugin(match)
+                          setQuery('')
+                        }}
+                        className={index === selectedIndex ? 'bg-accent' : ''}
+                      >
+                        <div className="flex items-center gap-3 w-full">
+                          {/* 插件图标 */}
+                          <div className="w-10 h-10 flex-shrink-0">
+                            {match.plugin.icon || (
+                              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary font-semibold">
+                                {match.plugin.name[0].toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 插件信息 */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold truncate">{match.plugin.name}</span>
+                              {match.plugin.config.featured && (
+                                <span className="text-yellow-500">★</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {match.plugin.description}
+                            </p>
+                          </div>
+
+                          {/* 快捷键提示 */}
+                          {index < 9 && (
+                            <Badge variant="outline" className="flex-shrink-0">
+                              Cmd+{index + 1}
+                            </Badge>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                ) : null}
+              </CommandList>
+            </Command>
+
+            {/* 提示文字 */}
+            {matchedPlugins.length > 0 && (
+              <div className="mt-2 text-xs text-muted-foreground text-center">
+                使用 ↑↓ 导航 • Enter 选择 • Cmd+1~9 快速选择 • Esc 关闭
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
