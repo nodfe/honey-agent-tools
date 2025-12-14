@@ -9,8 +9,13 @@ function App() {
   const isSettingsOpen = useAppStore((state) => state.isSettingsOpen)
   const hideWindow = useAppStore((state) => state.hideWindow)
 
+
+
   // 初始化快捷键
   useShortcut()
+
+  // 应用启动时的初始化逻辑已移除
+  // 窗口默认状态由 Tauri 应用配置控制，不再在 React 中重复设置
 
   // 处理输入框提交
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,9 +45,6 @@ function App() {
       id="app-root"
       className="w-full h-full flex justify-center items-center bg-transparent overflow-hidden"
     >
-      <div className="bg-red-500">
-        123
-      </div>
       <div
         className={`w-full h-full flex justify-center items-center transition-opacity duration-200 ${isWindowVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
