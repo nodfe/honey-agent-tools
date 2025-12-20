@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect, useRef } from 'react'
 import Settings from './components/Settings'
 import { useShortcut } from './hooks/useShortcut'
@@ -57,6 +58,9 @@ function App() {
 
     setActivePlugin(match.plugin)
 
+    // 执行插件并获取结果
+    let pluginResult: PluginResult | null = null
+    
     // 创建插件上下文
     const context = {
       input: match.extractedInput,
@@ -65,11 +69,6 @@ function App() {
 
       showNotification: (message: string) => {
         logger.log(`📢 [showNotification] ${message}`)
-        // 收集结果，稍后传递给窗口
-        return {
-          type: 'text' as const,
-          content: message,
-        }
       },
 
       copyToClipboard: async (text: string) => {
@@ -86,43 +85,43 @@ function App() {
       },
 
       showResult: (result: PluginResult) => {
-        logger.log('📊 Plugin result:', result)
-        return result
+        logger.log('📊 Plugin result via showResult:', result)
+        pluginResult = result
       },
     }
 
-    // 执行插件并获取结果
-    let result: any
     try {
-      result = await match.plugin.execute(context)
+      // 执行插件
+      await match.plugin.execute(context)
       
-      // 如果插件没有显式返回结果，使用默认格式
-      if (!result) {
-        result = {
-          type: 'text',
-          content: '插件执行完成',
-        }
-      }
-    } catch (error) {
-      logger.error('❌ Plugin execution failed:', error)
-      result = {
+      // 优先使用 showResult 设置的结果
+      const finalResult = pluginResult || {
         type: 'text',
-        content: `插件执行失败: ${error}`,
+        content: null, // 默认不显示任何文本，由插件 View 自行决定
       }
-    }
 
-    // 调用 Tauri 命令创建插件窗口
-    try {
+      // 调用 Tauri 命令创建插件窗口
       await invoke('create_plugin_window', {
         data: {
           plugin_id: match.plugin.id,
           plugin_name: match.plugin.name,
           input: match.extractedInput,
-          result,
+          result: finalResult,
         },
       })
     } catch (error) {
-      logger.error('❌ Failed to create plugin window:', error)
+      logger.error('❌ Plugin execution failed:', error)
+      await invoke('create_plugin_window', {
+        data: {
+          plugin_id: match.plugin.id,
+          plugin_name: match.plugin.name,
+          input: match.extractedInput,
+          result: {
+            type: 'text',
+            content: `插件执行失败: ${error}`,
+          },
+        },
+      })
     }
   }
 
@@ -167,6 +166,18 @@ function App() {
     resizeObserver.observe(contentRef.current)
     return () => resizeObserver.disconnect()
   }, [])
+
+  // 监听窗口失去焦点事件
+  useEffect(() => {
+    const unlisten = getCurrentWindow().listen('tauri://blur', () => {
+      logger.log('🔌 [窗口] 失去焦点，隐藏窗口')
+      hideWindow()
+    })
+
+    return () => {
+      unlisten.then((fn) => fn())
+    }
+  }, [hideWindow])
 
   // 点击窗口外部关闭窗口
   useEffect(() => {
@@ -235,9 +246,17 @@ function App() {
                                 <span className="text-yellow-500">★</span>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {match.plugin.description}
-                            </p>
+                            <div className="flex flex-col">
+                              <p className="text-sm text-muted-foreground truncate">
+                                {match.plugin.description}
+                              </p>
+                              {/* 插件预览内容 */}
+                              {match.plugin.getPreview && (
+                                <div className="mt-1">
+                                  {match.plugin.getPreview(match.extractedInput)}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* 快捷键提示 */}
