@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "honey-agent-tools",
+  "productName": "Honey Agent Tools",
   "version": "0.1.0",
   "identifier": "cn.nodfe.honey-agent-tools",
   "build": {

@@ -1,8 +1,9 @@
 [package]
 name = "honey-agent-tools"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A modern desktop efficiency tool powered by Tauri."
+authors = ["Nodfe"]
+license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

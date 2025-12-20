@@ -2,6 +2,9 @@
   "name": "honey-agent-tools",
   "private": true,
   "version": "0.1.0",
+  "description": "Honey Agent Tools - A modern desktop efficiency tool",
+  "author": "Nodfe",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
